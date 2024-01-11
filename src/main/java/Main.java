@@ -9,48 +9,57 @@ public class Main {
     public static void main(String[] args) {
 
         new Thread(() -> {
-            synchronized (sizeToFreq) {
-                
-                for (int i = 0; i < 1000; i++) {
 
-                    int countR = 0;
-                    int countQueue = 0;
-                    int countQueueMax = 0;
+            for (int i = 0; i < 1000; i++) {
 
-                    String s = generateRoute("RLRFR", 100);
+                int countR = 0;
+                int countQueue = 0;
+                int countQueueMax = 0;
 
-                    char[] sArray = s.toCharArray();
+                String s = generateRoute("RLRFR", 100);
 
-                    for (int j = 0; j < sArray.length; j++) {
+                char[] sArray = s.toCharArray();
 
-                        if (sArray[j] == 'R') {
-                            countR++;
-                            countQueue++;
-                        } else if (sArray[j] != 'R' && countQueue > countQueueMax) {
-                            countQueueMax = countQueue;
-                            countQueue = 0;
-                        } else if (sArray[j] != 'R') {
-                            countQueue = 0;
-                        }
+                for (int j = 0; j < sArray.length; j++) {
 
+                    if (sArray[j] == 'R') {
+                        countR++;
+                        countQueue++;
+                    } else if (sArray[j] != 'R' && countQueue > countQueueMax) {
+                        countQueueMax = countQueue;
+                        countQueue = 0;
+                    } else if (sArray[j] != 'R') {
+                        countQueue = 0;
+                    }
+                }
+
+                synchronized (sizeToFreq) {
+
+                    try {
+                        sizeToFreq.notify();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
 
                     sizeToFreq.put(countR, countQueueMax);
-                }
-
-                try {
-                    sizeToFreq.notify();
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
                 }
             }
         }).start();
 
 
         new Thread (() -> {
+
+            List<Map.Entry<Integer, Integer>> sortedList;
+
             synchronized (sizeToFreq) {
 
-                List<Map.Entry<Integer, Integer>> sortedList = sizeToFreq.entrySet().stream()
+                try {
+                    sizeToFreq.wait();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+
+                sortedList = sizeToFreq.entrySet().stream()
                         .sorted(Map.Entry.<Integer, Integer>comparingByValue().reversed()).toList();
 
                 if (!sortedList.isEmpty()) {
@@ -64,13 +73,8 @@ public class Main {
                         System.out.printf("- %d (%d раз)\n", entry.getKey(), entry.getValue());
                     }
                 }
-
-                try {
-                    sizeToFreq.wait();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
             }
+
         }).start();
     }
 
